@@ -23,8 +23,9 @@ map_m = convert_heightmap_to_meters(map_n, FIELD_CONFIG)
 
 print(map_m)
 
-p = a_star(map_m, (0, 0), (99, 99), MovementMode.FOUR_DIRECTIONS)
+p, b = a_star(map_m, (0, 0), (99, 99), MovementMode.FOUR_DIRECTIONS)
 print(p)
+print(b)
 
-p_map = draw_path(red_img, p)
+p_map = draw_path(red_img, p, b)
 p_map.save("output/path.png")

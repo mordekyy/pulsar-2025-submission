@@ -1,15 +1,14 @@
 from PIL import Image, ImageDraw
 
 
-def draw_path(img: Image.Image, path: list[tuple[int, int]]) -> Image.Image:
-
-    if (not path):
-        return img
-
+def draw_path(img: Image.Image, path: list[tuple[int, int]], blocked: list[tuple[int, int]]) -> Image.Image:
     out = img.copy()
     draw = ImageDraw.Draw(out)
 
-    for (r, c) in path:
+    for (r, c) in blocked:
+        draw.point((c, r), fill="black")
+
+    for (r, c) in path or []:
         draw.point((c, r), fill="red")
 
     if path:

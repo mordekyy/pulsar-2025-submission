@@ -39,23 +39,24 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
     start = tuple(start)
     end = tuple(end)
 
-    dirs = directions_from_movement_mode(movement_mode)
-
     ROW, COL = len(grid), len(grid[0])
 
-    if not (0 <= start[0] < ROW and 0 <= start[1] < COL):
-        return None
-    if not (0 <= end[0] < ROW and 0 <= end[1] < COL):
-        return None
+    blocked_cells = [(r, c) for r in range(ROW)
+                     for c in range(COL) if not is_unblocked(grid, r, c)]
+
+    if not is_valid(start[0], start[1], ROW, COL):
+        return None, blocked_cells
+    if not is_valid(end[0], end[1], ROW, COL):
+        return None, blocked_cells
     if start == end:
-        return [start]
+        return [start], blocked_cells
+
+    dirs = directions_from_movement_mode(movement_mode)
 
     g = {start: 0.0}
     parent = {start: start}
     f0 = g[start] + remaining_path(*start, end)
-
     openq = [(f0, start)]
-
     visited = set()
 
     while openq:
@@ -70,16 +71,20 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
                 node = parent[node]
             path.append(start)
             path.reverse()
-            return path
+            return path, blocked_cells
 
         visited.add(cur)
-
         r, c = cur
         for dr, dc in dirs:
             nr, nc = r + dr, c + dc
-            if not is_valid(nr, nc, ROW, COL) or not is_unblocked(grid, nr, nc) or (nr, nc) in visited:
+            if not is_valid(nr, nc, ROW, COL):
                 continue
-            step = sqrt(2.0) if len(dirs) > 4 else 1.0
+            if not is_unblocked(grid, nr, nc):
+                continue
+            if (nr, nc) in visited:
+                continue
+
+            step = sqrt(2.0) if (dr != 0 and dc != 0) else 1.0
             ng = g[cur] + step
             if ng < g.get((nr, nc), float("inf")):
                 g[(nr, nc)] = ng
@@ -87,4 +92,4 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
                 f = ng + remaining_path(nr, nc, end)
                 heappush(openq, (f, (nr, nc)))
 
-    return None
+    return None, blocked_cells
