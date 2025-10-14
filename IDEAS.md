@@ -3,7 +3,7 @@
 Python, with uv for deps management.
 
 Pathfinding algorithm: A*
-Config module
+Config module, with frozen read only dataclasses
 
 Required packages:
 - image: generated the field & processes to a numpy array
