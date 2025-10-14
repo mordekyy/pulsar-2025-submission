@@ -1,7 +1,7 @@
-from math import sqrt
+from math import sqrt, hypot, atan2, degrees
 from math import hypot
 from heapq import heappop, heappush
-from config import MovementMode
+from config import MovementMode, FIELD_CONFIG, ROBOT_CONFIG
 from finder.convert import directions_from_movement_mode
 
 
@@ -17,10 +17,15 @@ def is_valid(row, col, ROW, COL):
     return True
 
 
-def is_unblocked(grid, row, col):
-    return grid[row][col] <= 1.7
-    return True
-    return grid[row][col] == 1
+def is_unblocked(grid, curr, nxt):
+    (r, c), (nr, nc) = curr, nxt
+    dz = abs(grid[nr][nc] - grid[r][c])
+    dr, dc = abs(nr - r), abs(nc - c)
+    if dr == 0 and dc == 0:
+        return True
+    horiz = FIELD_CONFIG.PIXEL_SIZE_M * (sqrt(2.0) if dr and dc else 1.0)
+    angle = degrees(atan2(dz, horiz))
+    return angle <= ROBOT_CONFIG.MAX_SLOPE_DEG
 
 
 def is_destination(row, col, dest):
@@ -38,11 +43,9 @@ def remaining_path(row, col, dest):
 def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
     start = tuple(start)
     end = tuple(end)
-
     ROW, COL = len(grid), len(grid[0])
 
-    blocked_cells = [(r, c) for r in range(ROW)
-                     for c in range(COL) if not is_unblocked(grid, r, c)]
+    blocked_cells = []
 
     if not is_valid(start[0], start[1], ROW, COL):
         return None, blocked_cells
@@ -71,6 +74,7 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
                 node = parent[node]
             path.append(start)
             path.reverse()
+
             return path, blocked_cells
 
         visited.add(cur)
@@ -78,13 +82,14 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
         for dr, dc in dirs:
             nr, nc = r + dr, c + dc
             if not is_valid(nr, nc, ROW, COL):
+                blocked_cells.append((nr, nc))
                 continue
-            if not is_unblocked(grid, nr, nc):
+            if not is_unblocked(grid, (r, c), (nr, nc)):
+                blocked_cells.append((nr, nc))
                 continue
             if (nr, nc) in visited:
                 continue
-
-            step = sqrt(2.0) if (dr != 0 and dc != 0) else 1.0
+            step = sqrt(2.0) if (dr and dc) else 1.0
             ng = g[cur] + step
             if ng < g.get((nr, nc), float("inf")):
                 g[(nr, nc)] = ng

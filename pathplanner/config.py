@@ -21,7 +21,6 @@ class FieldConfig:
 @dataclass(frozen=True)
 class RobotConfig:
     MAX_SLOPE_DEG = 30.0
-    MAX_SLOPE_RAD = radians(MAX_SLOPE_DEG)
     START_POS = (0, 0)
     MOVEMENT_MODE = MovementMode.FOUR_DIRECTIONS
 
