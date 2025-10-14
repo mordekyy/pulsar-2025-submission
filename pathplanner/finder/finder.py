@@ -37,7 +37,7 @@ def is_destination(row, col, dest):
 
 
 def remaining_path(row, col, dest):
-    return hypot(row - dest[0], col - dest[1])
+    return hypot(row - dest[0], col - dest[1]) * ROBOT_CONFIG.REMAINING_DISTANCE_WEIGHT
 
 
 def a_star(
@@ -78,7 +78,8 @@ def a_star(
             if on_step:
                 visited_snapshot = set(visited)
                 visited_snapshot.add(cur)
-                emit_step(on_step, step_index, cur, visited_snapshot, openq, blocked_cells)
+                emit_step(on_step, step_index, cur,
+                          visited_snapshot, openq, blocked_cells)
             path = []
             node = cur
             while node != start:

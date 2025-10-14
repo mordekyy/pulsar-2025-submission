@@ -52,6 +52,7 @@ pub struct RobotConfig {
     pub start_pos: (usize, usize),
     pub movement_mode: MovementMode,
     pub slope_cost_weight: f32,
+    pub remaining_distance_weight: f32,
     pub trace_sample_stride: usize,
 }
 
@@ -62,6 +63,7 @@ impl Default for RobotConfig {
             start_pos: (0, 0),
             movement_mode: MovementMode::EightDirections,
             slope_cost_weight: 100.0,
+            remaining_distance_weight: 10.0,
             trace_sample_stride: 50,
         }
     }
@@ -69,7 +71,7 @@ impl Default for RobotConfig {
 
 pub static FIELD_CONFIG: FieldConfig = FieldConfig {
     image_size: 100,
-    blur_size: (100.0 * 2.0) / 100.0,
+    blur_size: (100.0 * 3.0) / 100.0,
     height_min_m: 0.0,
     height_max_m: 3.0,
     pixel_size_m: 0.1,
@@ -79,6 +81,7 @@ pub static ROBOT_CONFIG: RobotConfig = RobotConfig {
     max_slope_deg: 30.0,
     start_pos: (0, 0),
     movement_mode: MovementMode::EightDirections,
-    slope_cost_weight: 100.0,
+    slope_cost_weight: 1.0,
+    remaining_distance_weight: 10.0,
     trace_sample_stride: 50,
 };

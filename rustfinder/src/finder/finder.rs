@@ -43,12 +43,12 @@ fn is_valid(row: isize, col: isize, rows: usize, cols: usize) -> bool {
     row >= 0 && row < rows as isize && col >= 0 && col < cols as isize
 }
 
-fn remaining_path(row: usize, col: usize, dest: (usize, usize)) -> f32 {
+fn remaining_path(robot_config: &RobotConfig, row: usize, col: usize, dest: (usize, usize)) -> f32 {
     let (dr, dc) = (
         row as f32 - dest.0 as f32,
         col as f32 - dest.1 as f32,
     );
-    dr.hypot(dc)
+    dr.hypot(dc) * robot_config.remaining_distance_weight
 }
 
 #[inline]
@@ -120,7 +120,7 @@ pub fn a_star<'a>(
 
     g_score[start_idx] = 0.0;
     parent[start_idx] = start_idx;
-    let f0 = remaining_path(start.0, start.1, end);
+    let f0 = remaining_path(robot_config, start.0, start.1, end);
     open_queue.push(Reverse(QueueNode::new(f0, start_idx)));
 
     let directions = movement_mode.directions();
@@ -208,7 +208,7 @@ pub fn a_star<'a>(
             if tentative_g < g_score[next_idx] {
                 g_score[next_idx] = tentative_g;
                 parent[next_idx] = current_idx;
-                let f_cost = tentative_g + remaining_path(nr_usize, nc_usize, end);
+                let f_cost = tentative_g + remaining_path(robot_config, nr_usize, nc_usize, end);
                 open_queue.push(Reverse(QueueNode::new(f_cost, next_idx)));
             }
         }
