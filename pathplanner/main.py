@@ -1,3 +1,4 @@
+from finder.convert import convert_heightmap_to_meters
 from image.gen import noisy_square
 from image.process import get_red, normalize
 from config import FIELD_CONFIG, ROBOT_CONFIG
@@ -9,7 +10,12 @@ img.save("output/noisy.png")
 red_img = get_red(img)
 red_img.save("output/red.png")
 
-n = normalize(red_img)
+map_n = normalize(red_img)
 
-print(n)
+
 print(f"Max slope is {ROBOT_CONFIG.MAX_SLOPE_DEG}deg")
+
+
+map_m = convert_heightmap_to_meters(map_n, FIELD_CONFIG)
+
+print(map_m)

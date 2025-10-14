@@ -19,3 +19,11 @@ Generate the image.
 ## Part 2
 
 Process the image, extract red channel and normalize.
+
+## Part 3
+
+Convert to meters
+
+## Part 4
+https://www.geeksforgeeks.org/dsa/a-search-algorithm/
+Basic A*
