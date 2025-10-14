@@ -70,7 +70,7 @@ impl Default for RobotConfig {
 }
 
 pub static FIELD_CONFIG: FieldConfig = FieldConfig {
-    image_size: 100,
+    image_size: 512,
     blur_size: (100.0 * 3.0) / 100.0,
     height_min_m: 0.0,
     height_max_m: 3.0,
@@ -81,7 +81,7 @@ pub static ROBOT_CONFIG: RobotConfig = RobotConfig {
     max_slope_deg: 30.0,
     start_pos: (0, 0),
     movement_mode: MovementMode::EightDirections,
-    slope_cost_weight: 1.0,
-    remaining_distance_weight: 10.0,
+    slope_cost_weight: 100.0,
+    remaining_distance_weight: 5.0,
     trace_sample_stride: 50,
 };

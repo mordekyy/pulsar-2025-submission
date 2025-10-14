@@ -112,127 +112,292 @@ pub fn a_star<'a>(
     let start_idx = to_index(start.0, start.1, cols);
     let end_idx = to_index(end.0, end.1, cols);
 
-    let mut open_queue: BinaryHeap<Reverse<QueueNode>> = BinaryHeap::new();
-    let mut g_score: Vec<f32> = vec![f32::INFINITY; total_cells];
-    let mut parent: Vec<usize> = vec![usize::MAX; total_cells];
-    let mut visited: Vec<bool> = vec![false; total_cells];
+    let mut forward_open: BinaryHeap<Reverse<QueueNode>> = BinaryHeap::new();
+    let mut backward_open: BinaryHeap<Reverse<QueueNode>> = BinaryHeap::new();
+    let mut g_forward: Vec<f32> = vec![f32::INFINITY; total_cells];
+    let mut g_backward: Vec<f32> = vec![f32::INFINITY; total_cells];
+    let mut parent_forward: Vec<usize> = vec![usize::MAX; total_cells];
+    let mut parent_backward: Vec<usize> = vec![usize::MAX; total_cells];
+    let mut visited_forward: Vec<bool> = vec![false; total_cells];
+    let mut visited_backward: Vec<bool> = vec![false; total_cells];
+    let mut visited_union: Vec<bool> = vec![false; total_cells];
     let mut visited_coords: Vec<(usize, usize)> = Vec::with_capacity(total_cells);
 
-    g_score[start_idx] = 0.0;
-    parent[start_idx] = start_idx;
-    let f0 = remaining_path(robot_config, start.0, start.1, end);
-    open_queue.push(Reverse(QueueNode::new(f0, start_idx)));
+    g_forward[start_idx] = 0.0;
+    parent_forward[start_idx] = start_idx;
+    g_backward[end_idx] = 0.0;
+    parent_backward[end_idx] = end_idx;
+
+    forward_open.push(Reverse(QueueNode::new(
+        remaining_path(robot_config, start.0, start.1, end),
+        start_idx,
+    )));
+    backward_open.push(Reverse(QueueNode::new(
+        remaining_path(robot_config, end.0, end.1, start),
+        end_idx,
+    )));
 
     let directions = movement_mode.directions();
     let mut step_index = 0_usize;
-
     let mut open_buffer: Vec<(usize, usize)> = Vec::new();
+    let mut meet_idx: Option<usize> = None;
 
-    while let Some(Reverse(node)) = open_queue.pop() {
-        let current_idx = node.index;
-        if visited[current_idx] {
-            continue;
-        }
+    while !forward_open.is_empty() && !backward_open.is_empty() {
+        // Expand from the forward frontier
+        let meeting_from_forward = loop {
+            let Some(Reverse(node)) = forward_open.pop() else {
+                break None;
+            };
+            let current_idx = node.index;
+            if visited_forward[current_idx] {
+                continue;
+            }
+            visited_forward[current_idx] = true;
+            if !visited_union[current_idx] {
+                visited_union[current_idx] = true;
+                visited_coords.push(from_index(current_idx, cols));
+            }
 
-        let current = from_index(current_idx, cols);
+            if visited_backward[current_idx] {
+                if on_step.is_some() {
+                    open_buffer.clear();
+                    open_buffer.extend(
+                        forward_open
+                            .iter()
+                            .map(|entry| from_index(entry.0.index, cols)),
+                    );
+                    open_buffer.extend(
+                        backward_open
+                            .iter()
+                            .map(|entry| from_index(entry.0.index, cols)),
+                    );
+                    emit_step(
+                        &mut on_step,
+                        step_index,
+                        from_index(current_idx, cols),
+                        &visited_coords,
+                        &open_buffer,
+                        &blocked_cells,
+                        true,
+                    );
+                }
+                break Some(current_idx);
+            }
 
-        visited[current_idx] = true;
-        visited_coords.push(current);
+            let (r, c) = from_index(current_idx, cols);
+            for &(dr, dc) in directions.iter() {
+                let nr = r as isize + dr;
+                let nc = c as isize + dc;
+                if !is_valid(nr, nc, rows, cols) {
+                    let candidate = (nr, nc);
+                    if blocked_seen.insert(candidate) {
+                        blocked_cells.push(candidate);
+                    }
+                    continue;
+                }
 
-        if current_idx == end_idx {
+                let nr_usize = nr as usize;
+                let nc_usize = nc as usize;
+                let next_idx = to_index(nr_usize, nc_usize, cols);
+                let next = (nr_usize, nc_usize);
+
+                if !is_unblocked(grid, (r, c), next, field_config, robot_config) {
+                    let candidate = (nr, nc);
+                    if blocked_seen.insert(candidate) {
+                        blocked_cells.push(candidate);
+                    }
+                    continue;
+                }
+                if visited_forward[next_idx] {
+                    continue;
+                }
+
+                let base_step = if dr != 0 && dc != 0 { SQRT_2 } else { 1.0 };
+                let cost_multiplier = cost_map
+                    .map(|cm| cm[(nr_usize, nc_usize)])
+                    .unwrap_or(1.0);
+                let step_cost = base_step * cost_multiplier;
+                let tentative_g = g_forward[current_idx] + step_cost;
+
+                if tentative_g < g_forward[next_idx] {
+                    g_forward[next_idx] = tentative_g;
+                    parent_forward[next_idx] = current_idx;
+                    let f_cost =
+                        tentative_g + remaining_path(robot_config, nr_usize, nc_usize, end);
+                    forward_open.push(Reverse(QueueNode::new(f_cost, next_idx)));
+                }
+            }
+
             if on_step.is_some() {
                 open_buffer.clear();
                 open_buffer.extend(
-                    open_queue
+                    forward_open
                         .iter()
                         .map(|entry| from_index(entry.0.index, cols)),
                 );
-
+                open_buffer.extend(
+                    backward_open
+                        .iter()
+                        .map(|entry| from_index(entry.0.index, cols)),
+                );
                 emit_step(
                     &mut on_step,
                     step_index,
-                    current,
+                    from_index(current_idx, cols),
                     &visited_coords,
                     &open_buffer,
                     &blocked_cells,
-                    true,
+                    false,
                 );
             }
+            step_index += 1;
+            break None;
+        };
 
-            let mut path = Vec::new();
-            let mut node_idx = current_idx;
-            while node_idx != start_idx {
-                path.push(from_index(node_idx, cols));
-                node_idx = parent[node_idx];
-            }
-            path.push(start);
-            path.reverse();
-            return (Some(path), blocked_cells);
+        if let Some(idx) = meeting_from_forward {
+            meet_idx = Some(idx);
+            break;
         }
 
-        let (r, c) = current;
-        for &(dr, dc) in directions.iter() {
-            let nr = r as isize + dr;
-            let nc = c as isize + dc;
-            if !is_valid(nr, nc, rows, cols) {
-                let candidate = (nr, nc);
-                if blocked_seen.insert(candidate) {
-                    blocked_cells.push(candidate);
+        if backward_open.is_empty() {
+            break;
+        }
+
+        // Expand from the backward frontier
+        let meeting_from_backward = loop {
+            let Some(Reverse(node)) = backward_open.pop() else {
+                break None;
+            };
+            let current_idx = node.index;
+            if visited_backward[current_idx] {
+                continue;
+            }
+            visited_backward[current_idx] = true;
+            if !visited_union[current_idx] {
+                visited_union[current_idx] = true;
+                visited_coords.push(from_index(current_idx, cols));
+            }
+
+            if visited_forward[current_idx] {
+                if on_step.is_some() {
+                    open_buffer.clear();
+                    open_buffer.extend(
+                        forward_open
+                            .iter()
+                            .map(|entry| from_index(entry.0.index, cols)),
+                    );
+                    open_buffer.extend(
+                        backward_open
+                            .iter()
+                            .map(|entry| from_index(entry.0.index, cols)),
+                    );
+                    emit_step(
+                        &mut on_step,
+                        step_index,
+                        from_index(current_idx, cols),
+                        &visited_coords,
+                        &open_buffer,
+                        &blocked_cells,
+                        true,
+                    );
                 }
-                continue;
+                break Some(current_idx);
             }
 
-            let nr_usize = nr as usize;
-            let nc_usize = nc as usize;
-            let next_idx = to_index(nr_usize, nc_usize, cols);
-            let next = (nr_usize, nc_usize);
-
-            if !is_unblocked(grid, (r, c), next, field_config, robot_config) {
-                let candidate = (nr, nc);
-                if blocked_seen.insert(candidate) {
-                    blocked_cells.push(candidate);
+            let (r, c) = from_index(current_idx, cols);
+            for &(dr, dc) in directions.iter() {
+                let nr = r as isize + dr;
+                let nc = c as isize + dc;
+                if !is_valid(nr, nc, rows, cols) {
+                    let candidate = (nr, nc);
+                    if blocked_seen.insert(candidate) {
+                        blocked_cells.push(candidate);
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if visited[next_idx] {
-                continue;
+
+                let nr_usize = nr as usize;
+                let nc_usize = nc as usize;
+                let next_idx = to_index(nr_usize, nc_usize, cols);
+                let next = (nr_usize, nc_usize);
+
+                if !is_unblocked(grid, (r, c), next, field_config, robot_config) {
+                    let candidate = (nr, nc);
+                    if blocked_seen.insert(candidate) {
+                        blocked_cells.push(candidate);
+                    }
+                    continue;
+                }
+                if visited_backward[next_idx] {
+                    continue;
+                }
+
+                let base_step = if dr != 0 && dc != 0 { SQRT_2 } else { 1.0 };
+                let cost_multiplier = cost_map
+                    .map(|cm| cm[(nr_usize, nc_usize)])
+                    .unwrap_or(1.0);
+                let step_cost = base_step * cost_multiplier;
+                let tentative_g = g_backward[current_idx] + step_cost;
+
+                if tentative_g < g_backward[next_idx] {
+                    g_backward[next_idx] = tentative_g;
+                    parent_backward[next_idx] = current_idx;
+                    let f_cost =
+                        tentative_g + remaining_path(robot_config, nr_usize, nc_usize, start);
+                    backward_open.push(Reverse(QueueNode::new(f_cost, next_idx)));
+                }
             }
 
-            let base_step = if dr != 0 && dc != 0 { SQRT_2 } else { 1.0 };
-            let cost_multiplier = cost_map
-                .map(|cm| cm[(nr_usize, nc_usize)])
-                .unwrap_or(1.0);
-            let step_cost = base_step * cost_multiplier;
-            let tentative_g = g_score[current_idx] + step_cost;
-
-            if tentative_g < g_score[next_idx] {
-                g_score[next_idx] = tentative_g;
-                parent[next_idx] = current_idx;
-                let f_cost = tentative_g + remaining_path(robot_config, nr_usize, nc_usize, end);
-                open_queue.push(Reverse(QueueNode::new(f_cost, next_idx)));
+            if on_step.is_some() {
+                open_buffer.clear();
+                open_buffer.extend(
+                    forward_open
+                        .iter()
+                        .map(|entry| from_index(entry.0.index, cols)),
+                );
+                open_buffer.extend(
+                    backward_open
+                        .iter()
+                        .map(|entry| from_index(entry.0.index, cols)),
+                );
+                emit_step(
+                    &mut on_step,
+                    step_index,
+                    from_index(current_idx, cols),
+                    &visited_coords,
+                    &open_buffer,
+                    &blocked_cells,
+                    false,
+                );
             }
+            step_index += 1;
+            break None;
+        };
+
+        if let Some(idx) = meeting_from_backward {
+            meet_idx = Some(idx);
+            break;
         }
-
-        if on_step.is_some() {
-            open_buffer.clear();
-            open_buffer.extend(
-                open_queue
-                    .iter()
-                    .map(|entry| from_index(entry.0.index, cols)),
-            );
-
-            emit_step(
-                &mut on_step,
-                step_index,
-                current,
-                &visited_coords,
-                &open_buffer,
-                &blocked_cells,
-                false,
-            );
-        }
-        step_index += 1;
     }
 
-    (None, blocked_cells)
+    let Some(meeting_idx) = meet_idx else {
+        return (None, blocked_cells);
+    };
+
+    let mut path: Vec<(usize, usize)> = Vec::new();
+    let mut node_idx = meeting_idx;
+    while node_idx != start_idx {
+        path.push(from_index(node_idx, cols));
+        node_idx = parent_forward[node_idx];
+    }
+    path.push(start);
+    path.reverse();
+
+    let mut node_idx = meeting_idx;
+    while node_idx != end_idx {
+        node_idx = parent_backward[node_idx];
+        path.push(from_index(node_idx, cols));
+    }
+
+    (Some(path), blocked_cells)
 }

@@ -36,7 +36,11 @@ DESTINATION = (FIELD_CONFIG.IMAGE_SIZE-1, FIELD_CONFIG.IMAGE_SIZE-1)
 
 
 def record_step(snapshot: SearchStep):
-    if snapshot.step_index % SAMPLE_STRIDE != 0 and snapshot.current != DESTINATION:
+    if (
+        snapshot.step_index % SAMPLE_STRIDE != 0
+        and snapshot.current != DESTINATION
+        and not snapshot.is_goal
+    ):
         return
 
     blocked_cells = tuple(
@@ -53,6 +57,7 @@ def record_step(snapshot: SearchStep):
             "visited": snapshot.visited,
             "open": snapshot.open_nodes,
             "blocked": blocked_cells,
+            "goal": snapshot.is_goal,
         }
     )
 

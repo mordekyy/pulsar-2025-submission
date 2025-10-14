@@ -52,7 +52,8 @@ def a_star(
     end = tuple(end)
     ROW, COL = len(grid), len(grid[0])
 
-    blocked_cells = []
+    blocked_cells: list[tuple[int, int]] = []
+    blocked_seen: set[tuple[int, int]] = set()
 
     if not is_valid(start[0], start[1], ROW, COL):
         return None, blocked_cells
@@ -63,57 +64,115 @@ def a_star(
 
     dirs = directions_from_movement_mode(movement_mode)
 
-    g = {start: 0.0}
-    parent = {start: start}
-    f0 = g[start] + remaining_path(*start, end)
-    openq = [(f0, start)]
-    visited = set()
+    forward_open: list[tuple[float, int, tuple[int, int]]] = []
+    backward_open: list[tuple[float, int, tuple[int, int]]] = []
+
+    order = count()
+
+    def push(queue: list[tuple[float, int, tuple[int, int]]], f_cost: float, node: tuple[int, int]) -> None:
+        heappush(queue, (f_cost, next(order), node))
+
+    forward_g = {start: 0.0}
+    backward_g = {end: 0.0}
+    parent_forward = {start: start}
+    parent_backward = {end: end}
+    visited_forward: set[tuple[int, int]] = set()
+    visited_backward: set[tuple[int, int]] = set()
+    visited_union: set[tuple[int, int]] = set()
+
+    push(forward_open, remaining_path(*start, end), start)
+    push(backward_open, remaining_path(*end, start), end)
+
     step_index = 0
+    meet_node: tuple[int, int] | None = None
 
-    while openq:
-        _, cur = heappop(openq)
-        if cur in visited:
-            continue
-        if cur == end:
-            if on_step:
-                visited_snapshot = set(visited)
-                visited_snapshot.add(cur)
-                emit_step(on_step, step_index, cur,
-                          visited_snapshot, openq, blocked_cells)
-            path = []
-            node = cur
-            while node != start:
-                path.append(node)
-                node = parent[node]
-            path.append(start)
-            path.reverse()
+    def emit_snapshot(current: tuple[int, int], is_goal: bool) -> None:
+        if not on_step:
+            return
+        open_nodes = [node for _, _, node in forward_open]
+        open_nodes.extend(node for _, _, node in backward_open)
+        emit_step(
+            on_step,
+            step_index,
+            current,
+            visited_union,
+            [(0.0, node) for node in open_nodes],
+            blocked_cells,
+            is_goal=is_goal,
+        )
 
-            return path, blocked_cells
+    while forward_open and backward_open:
+        use_forward = forward_open[0][0] <= backward_open[0][0]
+        open_queue = forward_open if use_forward else backward_open
+        visited_self = visited_forward if use_forward else visited_backward
+        visited_other = visited_backward if use_forward else visited_forward
+        g_self = forward_g if use_forward else backward_g
+        parent_self = parent_forward if use_forward else parent_backward
+        target = end if use_forward else start
 
-        visited.add(cur)
-        r, c = cur
+        while open_queue:
+            _, _, current = heappop(open_queue)
+            if current in visited_self:
+                continue
+            break
+        else:
+            break
+
+        visited_self.add(current)
+        if current not in visited_union:
+            visited_union.add(current)
+
+        if current in visited_other:
+            meet_node = current
+            emit_snapshot(current, True)
+            break
+
+        r, c = current
         for dr, dc in dirs:
             nr, nc = r + dr, c + dc
             if not is_valid(nr, nc, ROW, COL):
-                blocked_cells.append((nr, nc))
+                if (nr, nc) not in blocked_seen:
+                    blocked_seen.add((nr, nc))
+                    blocked_cells.append((nr, nc))
                 continue
             if not is_unblocked(grid, (r, c), (nr, nc)):
-                blocked_cells.append((nr, nc))
+                if (nr, nc) not in blocked_seen:
+                    blocked_seen.add((nr, nc))
+                    blocked_cells.append((nr, nc))
                 continue
-            if (nr, nc) in visited:
+            nxt = (nr, nc)
+            if nxt in visited_self:
                 continue
             base_step = sqrt(2.0) if (dr and dc) else 1.0
             cost_multiplier = 1.0
             if cost_map is not None:
                 cost_multiplier = cost_map[nr][nc]
-            step = base_step * cost_multiplier
-            ng = g[cur] + step
-            if ng < g.get((nr, nc), float("inf")):
-                g[(nr, nc)] = ng
-                parent[(nr, nc)] = cur
-                f = ng + remaining_path(nr, nc, end)
-                heappush(openq, (f, (nr, nc)))
-        emit_step(on_step, step_index, cur, visited, openq, blocked_cells)
+            step_cost = base_step * cost_multiplier
+            tentative_g = g_self[current] + step_cost
+            if tentative_g < g_self.get(nxt, float("inf")):
+                g_self[nxt] = tentative_g
+                parent_self[nxt] = current
+                f_score = tentative_g + remaining_path(nr, nc, target)
+                push(open_queue, f_score, nxt)
+
+        emit_snapshot(current, False)
         step_index += 1
 
-    return None, blocked_cells
+    if meet_node is None:
+        return None, blocked_cells
+
+    path_forward: list[tuple[int, int]] = []
+    node = meet_node
+    while node != start:
+        path_forward.append(node)
+        node = parent_forward[node]
+    path_forward.append(start)
+    path_forward.reverse()
+
+    path_backward: list[tuple[int, int]] = []
+    node = meet_node
+    while node != end:
+        node = parent_backward[node]
+        path_backward.append(node)
+
+    return path_forward + path_backward, blocked_cells
