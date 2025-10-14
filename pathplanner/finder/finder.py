@@ -18,6 +18,7 @@ def is_valid(row, col, ROW, COL):
 
 
 def is_unblocked(grid, row, col):
+    return grid[row][col] <= 1.7
     return True
     return grid[row][col] == 1
 
@@ -45,10 +46,6 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
     if not (0 <= start[0] < ROW and 0 <= start[1] < COL):
         return None
     if not (0 <= end[0] < ROW and 0 <= end[1] < COL):
-        return None
-    if grid[start[0]][start[1]] != 1:
-        return None
-    if grid[end[0]][end[1]] != 1:
         return None
     if start == end:
         return [start]
