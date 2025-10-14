@@ -3,8 +3,12 @@
 Python, with uv for deps management.
 
 Pathfinding algorithm: A*
+Config module
 
-Dependencies
+Required packages:
+- image: generated the field & processes to a numpy array
+
+Dependencies:
 - numpy
 - pillow
 
