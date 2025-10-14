@@ -1,7 +1,7 @@
 from config import MovementMode
 from finder.finder import a_star
 from finder.messaging import SearchStep
-from finder.convert import convert_heightmap_to_meters
+from finder.convert import convert_heightmap_to_meters, compute_gradient_cost_map
 from image.gen import noisy_square
 from image.process import get_red, normalize
 from image.draw import draw_path
@@ -22,6 +22,7 @@ print(f"Max slope is {ROBOT_CONFIG.MAX_SLOPE_DEG}deg")
 
 
 map_m = convert_heightmap_to_meters(map_n, FIELD_CONFIG)
+cost_map = compute_gradient_cost_map(map_m, FIELD_CONFIG, ROBOT_CONFIG)
 
 print(map_m)
 
@@ -45,8 +46,14 @@ def record_step(snapshot: SearchStep):
     )
 
 
-p, b = a_star(map_m, (0, 0), (99, 99),
-              ROBOT_CONFIG.MOVEMENT_MODE, on_step=record_step)
+p, b = a_star(
+    map_m,
+    (0, 0),
+    (99, 99),
+    ROBOT_CONFIG.MOVEMENT_MODE,
+    cost_map=cost_map,
+    on_step=record_step,
+)
 print(p)
 print(b)
 

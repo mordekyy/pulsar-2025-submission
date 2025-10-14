@@ -23,6 +23,7 @@ class RobotConfig:
     MAX_SLOPE_DEG = 30.0
     START_POS = (0, 0)
     MOVEMENT_MODE = MovementMode.EIGHT_DIRECTIONS
+    SLOPE_COST_WEIGHT = 10.0
 
 
 FIELD_CONFIG = FieldConfig()

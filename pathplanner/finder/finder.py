@@ -40,7 +40,14 @@ def remaining_path(row, col, dest):
     return hypot(row - dest[0], col - dest[1])
 
 
-def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS, on_step: SearchStepCallback = None):
+def a_star(
+    grid,
+    start,
+    end,
+    movement_mode=MovementMode.FOUR_DIRECTIONS,
+    cost_map=None,
+    on_step: SearchStepCallback = None,
+):
     start = tuple(start)
     end = tuple(end)
     ROW, COL = len(grid), len(grid[0])
@@ -94,7 +101,11 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS, on_step
                 continue
             if (nr, nc) in visited:
                 continue
-            step = sqrt(2.0) if (dr and dc) else 1.0
+            base_step = sqrt(2.0) if (dr and dc) else 1.0
+            cost_multiplier = 1.0
+            if cost_map is not None:
+                cost_multiplier = cost_map[nr][nc]
+            step = base_step * cost_multiplier
             ng = g[cur] + step
             if ng < g.get((nr, nc), float("inf")):
                 g[(nr, nc)] = ng
