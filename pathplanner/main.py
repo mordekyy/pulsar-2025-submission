@@ -33,6 +33,7 @@ def record_step(snapshot: SearchStep):
     blocked_cells = tuple(
         cell for cell in snapshot.blocked if cell not in blocked_seen)
     blocked_seen.update(snapshot.blocked)
+    print(f"{snapshot.step_index} / {FIELD_CONFIG.IMAGE_SIZE ** 2}")
     trace.append(
         {
             "step": snapshot.step_index,
@@ -45,7 +46,7 @@ def record_step(snapshot: SearchStep):
 
 
 p, b = a_star(map_m, (0, 0), (99, 99),
-              MovementMode.FOUR_DIRECTIONS, on_step=record_step)
+              ROBOT_CONFIG.MOVEMENT_MODE, on_step=record_step)
 print(p)
 print(b)
 
