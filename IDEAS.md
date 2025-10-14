@@ -41,3 +41,7 @@ Basic A*
 ## Part 5
 
 animation
+
+## Part 5
+
+speedy rust

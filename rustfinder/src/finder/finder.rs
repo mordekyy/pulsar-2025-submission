@@ -109,8 +109,36 @@ pub fn a_star<'a>(
         return (Some(vec![start]), blocked_cells);
     }
 
+    let tolerance = robot_config.end_tolerance_px as isize;
+    let tol_sq = tolerance * tolerance;
+    let end_row = end.0 as isize;
+    let end_col = end.1 as isize;
+    let row_min = (end_row - tolerance).max(0);
+    let row_max = (end_row + tolerance).min(rows as isize - 1);
+    let col_min = (end_col - tolerance).max(0);
+    let col_max = (end_col + tolerance).min(cols as isize - 1);
+
     let start_idx = to_index(start.0, start.1, cols);
     let end_idx = to_index(end.0, end.1, cols);
+
+    let mut goal_indices: Vec<usize> = Vec::new();
+    for r in row_min..=row_max {
+        for c in col_min..=col_max {
+            let dr = r - end_row;
+            let dc = c - end_col;
+            if tol_sq == 0 {
+                if r == end_row && c == end_col {
+                    goal_indices.push(to_index(r as usize, c as usize, cols));
+                }
+            } else if dr * dr + dc * dc <= tol_sq {
+                goal_indices.push(to_index(r as usize, c as usize, cols));
+            }
+        }
+    }
+    if goal_indices.is_empty() {
+        goal_indices.push(end_idx);
+    }
+    let goal_set: HashSet<usize> = goal_indices.iter().copied().collect();
 
     let mut forward_open: BinaryHeap<Reverse<QueueNode>> = BinaryHeap::new();
     let mut backward_open: BinaryHeap<Reverse<QueueNode>> = BinaryHeap::new();
@@ -125,17 +153,20 @@ pub fn a_star<'a>(
 
     g_forward[start_idx] = 0.0;
     parent_forward[start_idx] = start_idx;
-    g_backward[end_idx] = 0.0;
-    parent_backward[end_idx] = end_idx;
-
     forward_open.push(Reverse(QueueNode::new(
         remaining_path(robot_config, start.0, start.1, end),
         start_idx,
     )));
-    backward_open.push(Reverse(QueueNode::new(
-        remaining_path(robot_config, end.0, end.1, start),
-        end_idx,
-    )));
+
+    for &goal_idx in &goal_indices {
+        g_backward[goal_idx] = 0.0;
+        parent_backward[goal_idx] = goal_idx;
+        let (gr, gc) = from_index(goal_idx, cols);
+        backward_open.push(Reverse(QueueNode::new(
+            remaining_path(robot_config, gr, gc, start),
+            goal_idx,
+        )));
+    }
 
     let directions = movement_mode.directions();
     let mut step_index = 0_usize;
@@ -156,6 +187,32 @@ pub fn a_star<'a>(
             if !visited_union[current_idx] {
                 visited_union[current_idx] = true;
                 visited_coords.push(from_index(current_idx, cols));
+            }
+
+            if goal_set.contains(&current_idx) {
+                if on_step.is_some() {
+                    open_buffer.clear();
+                    open_buffer.extend(
+                        forward_open
+                            .iter()
+                            .map(|entry| from_index(entry.0.index, cols)),
+                    );
+                    open_buffer.extend(
+                        backward_open
+                            .iter()
+                            .map(|entry| from_index(entry.0.index, cols)),
+                    );
+                    emit_step(
+                        &mut on_step,
+                        step_index,
+                        from_index(current_idx, cols),
+                        &visited_coords,
+                        &open_buffer,
+                        &blocked_cells,
+                        true,
+                    );
+                }
+                break Some(current_idx);
             }
 
             if visited_backward[current_idx] {
@@ -272,17 +329,43 @@ pub fn a_star<'a>(
             if visited_backward[current_idx] {
                 continue;
             }
-            visited_backward[current_idx] = true;
-            if !visited_union[current_idx] {
-                visited_union[current_idx] = true;
-                visited_coords.push(from_index(current_idx, cols));
-            }
+                visited_backward[current_idx] = true;
+                if !visited_union[current_idx] {
+                    visited_union[current_idx] = true;
+                    visited_coords.push(from_index(current_idx, cols));
+                }
 
-            if visited_forward[current_idx] {
-                if on_step.is_some() {
-                    open_buffer.clear();
-                    open_buffer.extend(
-                        forward_open
+                if current_idx == start_idx {
+                    if on_step.is_some() {
+                        open_buffer.clear();
+                        open_buffer.extend(
+                            forward_open
+                                .iter()
+                                .map(|entry| from_index(entry.0.index, cols)),
+                        );
+                        open_buffer.extend(
+                            backward_open
+                                .iter()
+                                .map(|entry| from_index(entry.0.index, cols)),
+                        );
+                        emit_step(
+                            &mut on_step,
+                            step_index,
+                            from_index(current_idx, cols),
+                            &visited_coords,
+                            &open_buffer,
+                            &blocked_cells,
+                            true,
+                        );
+                    }
+                    break Some(current_idx);
+                }
+
+                if visited_forward[current_idx] {
+                    if on_step.is_some() {
+                        open_buffer.clear();
+                        open_buffer.extend(
+                            forward_open
                             .iter()
                             .map(|entry| from_index(entry.0.index, cols)),
                     );
@@ -394,8 +477,12 @@ pub fn a_star<'a>(
     path.reverse();
 
     let mut node_idx = meeting_idx;
-    while node_idx != end_idx {
-        node_idx = parent_backward[node_idx];
+    loop {
+        let parent_idx = parent_backward[node_idx];
+        if parent_idx == usize::MAX || parent_idx == node_idx {
+            break;
+        }
+        node_idx = parent_idx;
         path.push(from_index(node_idx, cols));
     }
 

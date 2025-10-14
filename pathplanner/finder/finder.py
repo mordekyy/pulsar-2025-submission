@@ -1,5 +1,6 @@
 from math import sqrt, hypot, atan2, degrees
 from heapq import heappop, heappush
+from itertools import count
 from config import MovementMode, FIELD_CONFIG, ROBOT_CONFIG
 from finder.convert import directions_from_movement_mode
 from finder.messaging import SearchStepCallback, emit_step
@@ -64,6 +65,24 @@ def a_star(
 
     dirs = directions_from_movement_mode(movement_mode)
 
+    tolerance = ROBOT_CONFIG.END_TOLERANCE_PX
+    end_row, end_col = end
+    row_min = max(0, end_row - tolerance)
+    row_max = min(ROW - 1, end_row + tolerance)
+    col_min = max(0, end_col - tolerance)
+    col_max = min(COL - 1, end_col + tolerance)
+
+    goal_cells = set()
+    tol_sq = tolerance * tolerance
+    for r in range(row_min, row_max + 1):
+        for c in range(col_min, col_max + 1):
+            dr = r - end_row
+            dc = c - end_col
+            if dr * dr + dc * dc <= tol_sq:
+                goal_cells.add((r, c))
+    if not goal_cells:
+        goal_cells.add(end)
+
     forward_open: list[tuple[float, int, tuple[int, int]]] = []
     backward_open: list[tuple[float, int, tuple[int, int]]] = []
 
@@ -73,15 +92,18 @@ def a_star(
         heappush(queue, (f_cost, next(order), node))
 
     forward_g = {start: 0.0}
-    backward_g = {end: 0.0}
+    backward_g: dict[tuple[int, int], float] = {}
     parent_forward = {start: start}
-    parent_backward = {end: end}
+    parent_backward: dict[tuple[int, int], tuple[int, int]] = {}
     visited_forward: set[tuple[int, int]] = set()
     visited_backward: set[tuple[int, int]] = set()
     visited_union: set[tuple[int, int]] = set()
 
     push(forward_open, remaining_path(*start, end), start)
-    push(backward_open, remaining_path(*end, start), end)
+    for cell in goal_cells:
+        backward_g[cell] = 0.0
+        parent_backward[cell] = cell
+        push(backward_open, remaining_path(*cell, start), cell)
 
     step_index = 0
     meet_node: tuple[int, int] | None = None
@@ -121,6 +143,11 @@ def a_star(
         visited_self.add(current)
         if current not in visited_union:
             visited_union.add(current)
+
+        if current in goal_cells:
+            meet_node = current
+            emit_snapshot(current, True)
+            break
 
         if current in visited_other:
             meet_node = current
@@ -171,8 +198,11 @@ def a_star(
 
     path_backward: list[tuple[int, int]] = []
     node = meet_node
-    while node != end:
-        node = parent_backward[node]
+    while True:
+        parent_node = parent_backward.get(node, node)
+        if parent_node == node:
+            break
+        node = parent_node
         path_backward.append(node)
 
     return path_forward + path_backward, blocked_cells

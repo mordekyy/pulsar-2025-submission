@@ -24,6 +24,7 @@ class RobotConfig:
     SLOPE_COST_WEIGHT = 10.0
     REMAINING_DISTANCE_WEIGHT = 10.0
     TRACE_SAMPLE_STRIDE: int = 50
+    END_TOLERANCE_PX: int = 5
 
 
 FIELD_CONFIG = FieldConfig()

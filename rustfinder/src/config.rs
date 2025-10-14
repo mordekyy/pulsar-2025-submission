@@ -54,6 +54,7 @@ pub struct RobotConfig {
     pub slope_cost_weight: f32,
     pub remaining_distance_weight: f32,
     pub trace_sample_stride: usize,
+    pub end_tolerance_px: usize,
 }
 
 impl Default for RobotConfig {
@@ -65,13 +66,14 @@ impl Default for RobotConfig {
             slope_cost_weight: 100.0,
             remaining_distance_weight: 10.0,
             trace_sample_stride: 50,
+            end_tolerance_px: 5,
         }
     }
 }
 
 pub static FIELD_CONFIG: FieldConfig = FieldConfig {
-    image_size: 512,
-    blur_size: (100.0 * 3.0) / 100.0,
+    image_size: 100,
+    blur_size: 3.0,
     height_min_m: 0.0,
     height_max_m: 3.0,
     pixel_size_m: 0.1,
@@ -84,4 +86,5 @@ pub static ROBOT_CONFIG: RobotConfig = RobotConfig {
     slope_cost_weight: 100.0,
     remaining_distance_weight: 5.0,
     trace_sample_stride: 50,
+    end_tolerance_px: 5,
 };
