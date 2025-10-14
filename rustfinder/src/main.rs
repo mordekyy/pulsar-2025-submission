@@ -4,6 +4,7 @@ mod image;
 
 use std::collections::HashSet;
 use std::fs;
+use std::time::Instant;
 
 use anyhow::Result;
 
@@ -13,10 +14,25 @@ use image::{draw_path, get_red_channel, noisy_square, normalize_to_ndarray, rend
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    let trace_enabled = args.iter().any(|arg| arg == "--trace");
+    let mut trace_enabled = false;
+    let mut trace_interval: Option<usize> = None;
+
+    for arg in args.iter().skip(1) {
+        if arg == "--trace" {
+            trace_enabled = true;
+        } else if let Some(value) = arg.strip_prefix("--trace-step=") {
+            if let Ok(parsed) = value.parse::<usize>() {
+                if parsed > 0 {
+                    trace_interval = Some(parsed);
+                }
+            }
+        }
+    }
 
     let field_config = &FIELD_CONFIG;
     let robot_config = &ROBOT_CONFIG;
+
+    let pipeline_start = Instant::now();
 
     println!("Generating image with {}", field_config.image_size);
     fs::create_dir_all("output")?;
@@ -44,26 +60,35 @@ fn main() -> Result<()> {
         }
     }
     println!(
-        "Height map range: {:.3} m – {:.3} m",
+        "Height map range: {:.3} m - {:.3} m",
         min_height, max_height
     );
 
     let mut trace: Vec<SearchStep> = Vec::new();
     let mut blocked_seen: HashSet<(isize, isize)> = HashSet::new();
 
+    let max_frames = 200usize;
+    let sample_stride = trace_interval
+        .unwrap_or(robot_config.trace_sample_stride)
+        .max(1);
+
     let destination = (
         (field_config.image_size - 1) as usize,
         (field_config.image_size - 1) as usize,
     );
 
+    let search_start = Instant::now();
     let (path, blocked) = if trace_enabled {
         let mut callback = |mut snapshot: SearchStep| {
+            if snapshot.step_index % sample_stride != 0 && !snapshot.is_goal {
+                return;
+            }
+
             snapshot.blocked.retain(|cell| blocked_seen.insert(*cell));
-            if snapshot.step_index % 500 == 0 {
+            if snapshot.step_index % (sample_stride * 10) == 0 && snapshot.step_index > 0 {
                 println!(
-                    "{} / {} steps",
-                    snapshot.step_index,
-                    field_config.image_size.pow(2)
+                    "{} steps processed (sampling every {})",
+                    snapshot.step_index, sample_stride
                 );
             }
             trace.push(snapshot);
@@ -91,6 +116,7 @@ fn main() -> Result<()> {
             None,
         )
     };
+    let search_duration = search_start.elapsed();
 
     match path.as_ref() {
         Some(path_cells) => println!("Path length: {} nodes", path_cells.len()),
@@ -110,7 +136,7 @@ fn main() -> Result<()> {
                 &trace,
                 Some(path_cells.as_slice()),
                 "output/search.gif",
-                200,
+                max_frames,
                 50,
                 700,
             )?;
@@ -118,6 +144,10 @@ fn main() -> Result<()> {
     } else {
         println!("Path not found.");
     }
+
+    let pipeline_duration = pipeline_start.elapsed();
+    println!("Search time: {:.3}s", search_duration.as_secs_f32());
+    println!("Total pipeline time: {:.3}s", pipeline_duration.as_secs_f32());
 
     Ok(())
 }

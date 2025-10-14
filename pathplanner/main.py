@@ -1,3 +1,5 @@
+from time import perf_counter
+
 from config import MovementMode
 from finder.finder import a_star
 from finder.messaging import SearchStep
@@ -9,6 +11,7 @@ from image.animate import render_search_gif
 from config import FIELD_CONFIG, ROBOT_CONFIG
 
 print(f"Generating image with {FIELD_CONFIG.IMAGE_SIZE}")
+pipeline_start = perf_counter()
 img = noisy_square(FIELD_CONFIG.IMAGE_SIZE, None, FIELD_CONFIG.BLUR_SIZE)
 img.save("output/noisy.png")
 
@@ -28,13 +31,21 @@ print(map_m)
 
 trace = []
 blocked_seen = set()
+SAMPLE_STRIDE = ROBOT_CONFIG.TRACE_SAMPLE_STRIDE
+DESTINATION = (FIELD_CONFIG.IMAGE_SIZE-1, FIELD_CONFIG.IMAGE_SIZE-1)
 
 
 def record_step(snapshot: SearchStep):
+    if snapshot.step_index % SAMPLE_STRIDE != 0 and snapshot.current != DESTINATION:
+        return
+
     blocked_cells = tuple(
         cell for cell in snapshot.blocked if cell not in blocked_seen)
     blocked_seen.update(snapshot.blocked)
-    print(f"{snapshot.step_index} / {FIELD_CONFIG.IMAGE_SIZE ** 2}")
+    if snapshot.step_index % (SAMPLE_STRIDE * 10) == 0:
+        print(
+            f"{snapshot.step_index} steps processed (sampling every {SAMPLE_STRIDE})"
+        )
     trace.append(
         {
             "step": snapshot.step_index,
@@ -46,14 +57,16 @@ def record_step(snapshot: SearchStep):
     )
 
 
+search_start = perf_counter()
 p, b = a_star(
     map_m,
     (0, 0),
-    (FIELD_CONFIG.IMAGE_SIZE-1, FIELD_CONFIG.IMAGE_SIZE-1),
+    DESTINATION,
     ROBOT_CONFIG.MOVEMENT_MODE,
     cost_map=cost_map,
     on_step=record_step,
 )
+search_elapsed = perf_counter() - search_start
 print(p)
 print(b)
 
@@ -61,3 +74,6 @@ p_map = draw_path(red_img, p, b)
 p_map.save("output/path.png")
 
 render_search_gif(red_img, trace, p, "output/search.gif")
+pipeline_elapsed = perf_counter() - pipeline_start
+print(f"Search time: {search_elapsed:.3f}s")
+print(f"Total pipeline time: {pipeline_elapsed:.3f}s")

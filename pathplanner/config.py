@@ -1,5 +1,3 @@
-from numpy import array
-from math import radians
 from enum import Enum
 from dataclasses import dataclass
 
@@ -11,7 +9,7 @@ class MovementMode(Enum):
 
 @dataclass(frozen=True)
 class FieldConfig:
-    IMAGE_SIZE: int = 256
+    IMAGE_SIZE: int = 100
     BLUR_SIZE: float = IMAGE_SIZE * 2 / 100
     HEIGHT_MIN_M: float = 0.0
     HEIGHT_MAX_M: float = 3.0
@@ -24,6 +22,7 @@ class RobotConfig:
     START_POS = (0, 0)
     MOVEMENT_MODE = MovementMode.EIGHT_DIRECTIONS
     SLOPE_COST_WEIGHT = 100.0
+    TRACE_SAMPLE_STRIDE: int = 50
 
 
 FIELD_CONFIG = FieldConfig()

@@ -1,5 +1,5 @@
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashSet};
 use std::f32::consts::SQRT_2;
 
 use ndarray::Array2;
@@ -14,20 +14,20 @@ pub type Grid = Array2<f32>;
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct QueueNode {
     f_cost: NotNan<f32>,
-    position: (usize, usize),
+    index: usize,
 }
 
 impl QueueNode {
-    fn new(f_cost: f32, position: (usize, usize)) -> Self {
+    fn new(f_cost: f32, index: usize) -> Self {
         let f = NotNan::new(f_cost).unwrap_or_else(|_| NotNan::new(f32::INFINITY).unwrap());
-        Self { f_cost: f, position }
+        Self { f_cost: f, index }
     }
 }
 
 impl Ord for QueueNode {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.f_cost.cmp(&other.f_cost) {
-            Ordering::Equal => self.position.cmp(&other.position),
+            Ordering::Equal => self.index.cmp(&other.index),
             ord => ord,
         }
     }
@@ -49,6 +49,16 @@ fn remaining_path(row: usize, col: usize, dest: (usize, usize)) -> f32 {
         col as f32 - dest.1 as f32,
     );
     dr.hypot(dc)
+}
+
+#[inline]
+fn to_index(row: usize, col: usize, cols: usize) -> usize {
+    row * cols + col
+}
+
+#[inline]
+fn from_index(index: usize, cols: usize) -> (usize, usize) {
+    (index / cols, index % cols)
 }
 
 fn is_unblocked(
@@ -84,8 +94,10 @@ pub fn a_star<'a>(
 ) -> (Option<Vec<(usize, usize)>>, Vec<(isize, isize)>) {
     let rows = grid.nrows();
     let cols = grid.ncols();
+    let total_cells = rows * cols;
 
     let mut blocked_cells: Vec<(isize, isize)> = Vec::new();
+    let mut blocked_seen: HashSet<(isize, isize)> = HashSet::with_capacity(rows + cols);
 
     if !is_valid(start.0 as isize, start.1 as isize, rows, cols) {
         return (None, blocked_cells);
@@ -97,70 +109,92 @@ pub fn a_star<'a>(
         return (Some(vec![start]), blocked_cells);
     }
 
+    let start_idx = to_index(start.0, start.1, cols);
+    let end_idx = to_index(end.0, end.1, cols);
+
     let mut open_queue: BinaryHeap<Reverse<QueueNode>> = BinaryHeap::new();
-    let mut g_score: HashMap<(usize, usize), f32> = HashMap::new();
-    let mut parent: HashMap<(usize, usize), (usize, usize)> = HashMap::new();
-    let mut visited: HashSet<(usize, usize)> = HashSet::new();
+    let mut g_score: Vec<f32> = vec![f32::INFINITY; total_cells];
+    let mut parent: Vec<usize> = vec![usize::MAX; total_cells];
+    let mut visited: Vec<bool> = vec![false; total_cells];
+    let mut visited_coords: Vec<(usize, usize)> = Vec::with_capacity(total_cells);
 
-    g_score.insert(start, 0.0);
-    parent.insert(start, start);
+    g_score[start_idx] = 0.0;
+    parent[start_idx] = start_idx;
     let f0 = remaining_path(start.0, start.1, end);
-    open_queue.push(Reverse(QueueNode::new(f0, start)));
+    open_queue.push(Reverse(QueueNode::new(f0, start_idx)));
 
-    let mut step_index = 0_usize;
     let directions = movement_mode.directions();
+    let mut step_index = 0_usize;
+
+    let mut open_buffer: Vec<(usize, usize)> = Vec::new();
 
     while let Some(Reverse(node)) = open_queue.pop() {
-        let current = node.position;
-        if visited.contains(&current) {
+        let current_idx = node.index;
+        if visited[current_idx] {
             continue;
         }
 
-        if current == end {
-            let mut snapshot_iter = visited.iter().copied().collect::<Vec<_>>();
-            snapshot_iter.push(current);
-            let open_snapshot: Vec<(usize, usize)> =
-                open_queue.iter().map(|entry| entry.0.position).collect();
-            emit_step(
-                &mut on_step,
-                step_index,
-                current,
-                snapshot_iter.into_iter(),
-                &open_snapshot,
-                &blocked_cells,
-            );
+        let current = from_index(current_idx, cols);
+
+        visited[current_idx] = true;
+        visited_coords.push(current);
+
+        if current_idx == end_idx {
+            if on_step.is_some() {
+                open_buffer.clear();
+                open_buffer.extend(
+                    open_queue
+                        .iter()
+                        .map(|entry| from_index(entry.0.index, cols)),
+                );
+
+                emit_step(
+                    &mut on_step,
+                    step_index,
+                    current,
+                    &visited_coords,
+                    &open_buffer,
+                    &blocked_cells,
+                    true,
+                );
+            }
 
             let mut path = Vec::new();
-            let mut node_pos = current;
-            while node_pos != start {
-                path.push(node_pos);
-                node_pos = parent[&node_pos];
+            let mut node_idx = current_idx;
+            while node_idx != start_idx {
+                path.push(from_index(node_idx, cols));
+                node_idx = parent[node_idx];
             }
             path.push(start);
             path.reverse();
             return (Some(path), blocked_cells);
         }
 
-        visited.insert(current);
-
         let (r, c) = current;
         for &(dr, dc) in directions.iter() {
             let nr = r as isize + dr;
             let nc = c as isize + dc;
             if !is_valid(nr, nc, rows, cols) {
-                blocked_cells.push((nr, nc));
+                let candidate = (nr, nc);
+                if blocked_seen.insert(candidate) {
+                    blocked_cells.push(candidate);
+                }
                 continue;
             }
 
             let nr_usize = nr as usize;
             let nc_usize = nc as usize;
+            let next_idx = to_index(nr_usize, nc_usize, cols);
             let next = (nr_usize, nc_usize);
 
             if !is_unblocked(grid, (r, c), next, field_config, robot_config) {
-                blocked_cells.push((nr, nc));
+                let candidate = (nr, nc);
+                if blocked_seen.insert(candidate) {
+                    blocked_cells.push(candidate);
+                }
                 continue;
             }
-            if visited.contains(&next) {
+            if visited[next_idx] {
                 continue;
             }
 
@@ -169,27 +203,34 @@ pub fn a_star<'a>(
                 .map(|cm| cm[(nr_usize, nc_usize)])
                 .unwrap_or(1.0);
             let step_cost = base_step * cost_multiplier;
-            let tentative_g = g_score.get(&current).copied().unwrap_or(f32::INFINITY) + step_cost;
+            let tentative_g = g_score[current_idx] + step_cost;
 
-            if tentative_g < g_score.get(&next).copied().unwrap_or(f32::INFINITY) {
-                g_score.insert(next, tentative_g);
-                parent.insert(next, current);
+            if tentative_g < g_score[next_idx] {
+                g_score[next_idx] = tentative_g;
+                parent[next_idx] = current_idx;
                 let f_cost = tentative_g + remaining_path(nr_usize, nc_usize, end);
-                open_queue.push(Reverse(QueueNode::new(f_cost, next)));
+                open_queue.push(Reverse(QueueNode::new(f_cost, next_idx)));
             }
         }
 
-        let visited_iter = visited.iter().copied();
-        let open_snapshot: Vec<(usize, usize)> =
-            open_queue.iter().map(|entry| entry.0.position).collect();
-        emit_step(
-            &mut on_step,
-            step_index,
-            current,
-            visited_iter,
-            &open_snapshot,
-            &blocked_cells,
-        );
+        if on_step.is_some() {
+            open_buffer.clear();
+            open_buffer.extend(
+                open_queue
+                    .iter()
+                    .map(|entry| from_index(entry.0.index, cols)),
+            );
+
+            emit_step(
+                &mut on_step,
+                step_index,
+                current,
+                &visited_coords,
+                &open_buffer,
+                &blocked_cells,
+                false,
+            );
+        }
         step_index += 1;
     }
 

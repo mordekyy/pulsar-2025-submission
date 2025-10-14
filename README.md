@@ -18,3 +18,6 @@
 ```bash
     uv run ./main.py
 ```
+
+to run rust version
+cargo run --release -- --trace-step=50 --trace
