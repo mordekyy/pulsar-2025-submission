@@ -6,6 +6,20 @@ This repository contains two implementations of the same autonomous terrain plan
 
 Both versions share identical configuration defaults so you can compare behaviour, speed and visual output side by side.
 
+## Sample outputs
+
+Python run (`pathplanner/output/`):
+
+![Generated terrain](pathplanner/output/noisy.png)
+![Path overlay](pathplanner/output/path.png)
+![Search animation](pathplanner/output/search.gif)
+
+Rust run (`rustfinder/output/`):
+
+![Generated terrain (Rust)](rustfinder/output/noisy.png)
+![Path overlay (Rust)](rustfinder/output/path.png)
+![Search animation (Rust)](rustfinder/output/search.gif)
+
 ## Why this project
 
 The original software department challenge (described in `TASKS.md`) asked us to guide a rover across a 100x100 height map, obeying a 30deg slope limit. The work evolved in three phases:
@@ -98,17 +112,3 @@ The Rust binary writes the same image and GIF artefacts into `rustfinder/output/
 2. Run `cargo run . --trace --release` and note the reported timings.
 
 Both runs use the same config defaults so the path, generated artefacts and GIF should match closely.
-
-## Sample outputs
-
-Python run (`pathplanner/output/`):
-
-![Generated terrain](pathplanner/output/noisy.png)
-![Path overlay](pathplanner/output/path.png)
-![Search animation](pathplanner/output/search.gif)
-
-Rust run (`rustfinder/output/`):
-
-![Generated terrain (Rust)](rustfinder/output/noisy.png)
-![Path overlay (Rust)](rustfinder/output/path.png)
-![Search animation (Rust)](rustfinder/output/search.gif)
