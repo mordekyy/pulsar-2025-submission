@@ -1,7 +1,7 @@
 from math import hypot
 from heapq import heappop, heappush
 from config import MovementMode
-from convert import directions_from_movement_mode
+from finder.convert import directions_from_movement_mode
 
 
 def is_valid(row, col, ROW, COL):
@@ -55,14 +55,21 @@ def a_star(grid, start, end):
         if cur == end:
             if start == end:
                 return [start]
-            return None
+            path = []
+            node = cur
+            while node != start:
+                path.append(node)
+                node = parent[node]
+            path.append(start)
+            path.reverse()
+            return path
 
         visited.add(cur)
 
         r, c = cur
         for dr, dc in dirs:
             nr, nc = r + dr, c + dc
-            if not is_valid(nr, nc) or not is_unblocked(nr, nc) or (nr, nc) in visited:
+            if not is_valid(nr, nc, ROW, COL) or not is_unblocked(grid, nr, nc) or (nr, nc) in visited:
                 continue
             ng = g[cur] + 1.0
             if ng < g.get((nr, nc), float("inf")):
