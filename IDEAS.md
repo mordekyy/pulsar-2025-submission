@@ -37,3 +37,7 @@ Basic A*
 - step cost = 0.1m or sqrt(2)m depending on move
 - update g, f, parent if better path found
 - return path and blocked cells list
+
+## Part 5
+
+animation

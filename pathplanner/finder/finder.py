@@ -1,8 +1,8 @@
 from math import sqrt, hypot, atan2, degrees
-from math import hypot
 from heapq import heappop, heappush
 from config import MovementMode, FIELD_CONFIG, ROBOT_CONFIG
 from finder.convert import directions_from_movement_mode
+from finder.messaging import SearchStepCallback, emit_step
 
 
 def is_valid(row, col, ROW, COL):
@@ -40,7 +40,7 @@ def remaining_path(row, col, dest):
     return hypot(row - dest[0], col - dest[1])
 
 
-def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
+def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS, on_step: SearchStepCallback = None):
     start = tuple(start)
     end = tuple(end)
     ROW, COL = len(grid), len(grid[0])
@@ -61,12 +61,17 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
     f0 = g[start] + remaining_path(*start, end)
     openq = [(f0, start)]
     visited = set()
+    step_index = 0
 
     while openq:
         _, cur = heappop(openq)
         if cur in visited:
             continue
         if cur == end:
+            if on_step:
+                visited_snapshot = set(visited)
+                visited_snapshot.add(cur)
+                emit_step(on_step, step_index, cur, visited_snapshot, openq, blocked_cells)
             path = []
             node = cur
             while node != start:
@@ -96,5 +101,7 @@ def a_star(grid, start, end, movement_mode=MovementMode.FOUR_DIRECTIONS):
                 parent[(nr, nc)] = cur
                 f = ng + remaining_path(nr, nc, end)
                 heappush(openq, (f, (nr, nc)))
+        emit_step(on_step, step_index, cur, visited, openq, blocked_cells)
+        step_index += 1
 
     return None, blocked_cells

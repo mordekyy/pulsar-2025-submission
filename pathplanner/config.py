@@ -12,7 +12,7 @@ class MovementMode(Enum):
 @dataclass(frozen=True)
 class FieldConfig:
     IMAGE_SIZE: int = 100
-    BLUR_SIZE: float = IMAGE_SIZE * 2 / 100
+    BLUR_SIZE: float = IMAGE_SIZE * 3 / 100
     HEIGHT_MIN_M: float = 0.0
     HEIGHT_MAX_M: float = 3.0
     PIXEL_SIZE_M: float = 0.1
