@@ -10,7 +10,10 @@
     cd pathplanner
 ```
 
-3. Run the main script:
+3. Edit the config
+    You can edit config variables in 'config.py'
+
+4. Run the main script:
 
 ```bash
     uv run ./main.py

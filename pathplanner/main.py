@@ -49,7 +49,7 @@ def record_step(snapshot: SearchStep):
 p, b = a_star(
     map_m,
     (0, 0),
-    (99, 99),
+    (FIELD_CONFIG.IMAGE_SIZE-1, FIELD_CONFIG.IMAGE_SIZE-1),
     ROBOT_CONFIG.MOVEMENT_MODE,
     cost_map=cost_map,
     on_step=record_step,
