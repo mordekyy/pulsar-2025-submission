@@ -144,7 +144,7 @@ def a_star(
         if current not in visited_union:
             visited_union.add(current)
 
-        if current in goal_cells:
+        if use_forward and current in goal_cells:
             meet_node = current
             emit_snapshot(current, True)
             break
@@ -190,10 +190,15 @@ def a_star(
 
     path_forward: list[tuple[int, int]] = []
     node = meet_node
-    while node != start:
+    while True:
         path_forward.append(node)
-        node = parent_forward[node]
-    path_forward.append(start)
+        if node == start:
+            break
+        parent_node = parent_forward.get(node)
+        if parent_node is None or parent_node == node:
+            path_forward.append(start)
+            break
+        node = parent_node
     path_forward.reverse()
 
     path_backward: list[tuple[int, int]] = []

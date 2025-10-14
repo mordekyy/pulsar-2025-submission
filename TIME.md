@@ -1,4 +1,6 @@
 rust
-Total pipeline time: 2.781s
+Search time: 2.453s
 python
-Total pipeline time: 46.865s
+Search time: 3.814s
+
+Rust is twice as fast
