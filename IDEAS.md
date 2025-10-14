@@ -10,4 +10,8 @@ Dependencies
 
 ## Part 1
 
-Generate the image
+Generate the image.
+
+## Part 2
+
+Process the image, extract red channel and normalize.
